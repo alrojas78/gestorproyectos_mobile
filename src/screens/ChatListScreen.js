@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,14 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
+  ScrollView,
+  Modal,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { chatApi, usersApi, projectsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import debugLogger from '../services/debugLogger';
 
 const ChatListScreen = () => {
   const navigation = useNavigation();
@@ -26,13 +29,28 @@ const ChatListScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('contacts');
   const [error, setError] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugLogs, setDebugLogs] = useState([]);
+
+  // Suscribirse a los logs de debug
+  useEffect(() => {
+    const unsubscribe = debugLogger.subscribe((logs) => {
+      setDebugLogs([...logs]);
+    });
+    // Cargar logs existentes
+    setDebugLogs(debugLogger.getLogs());
+    return unsubscribe;
+  }, []);
 
   const loadData = async () => {
+    debugLogger.api('loadData() iniciado');
     setError(null);
     try {
       // Cargar usuarios con estado online
       try {
+        debugLogger.api('Cargando usuarios online-status...');
         const usersData = await usersApi.getOnlineStatus();
+        debugLogger.api('Usuarios recibidos', { count: usersData?.length, isArray: Array.isArray(usersData) });
         if (Array.isArray(usersData)) {
           setUsers(usersData.filter(u => u.id !== user?.id));
           const statusMap = {};
@@ -42,44 +60,51 @@ const ChatListScreen = () => {
           setOnlineStatus(statusMap);
         }
       } catch (e) {
-        console.log('Error cargando usuarios:', e.message);
+        debugLogger.error('Error cargando usuarios', { error: e.message, status: e.response?.status });
       }
 
       // Cargar conversaciones
       try {
+        debugLogger.api('Cargando conversaciones...');
         const convData = await chatApi.getConversations();
+        debugLogger.api('Conversaciones recibidas', { count: convData?.length, isArray: Array.isArray(convData) });
         if (Array.isArray(convData)) {
           setConversations(convData);
         }
       } catch (e) {
-        console.log('Error cargando conversaciones:', e.message);
+        debugLogger.error('Error cargando conversaciones', { error: e.message, status: e.response?.status });
       }
 
       // Cargar proyectos
       try {
+        debugLogger.api('Cargando proyectos...');
         const projectsData = await projectsApi.getAll();
+        debugLogger.api('Proyectos recibidos', { count: projectsData?.length, isArray: Array.isArray(projectsData) });
         if (Array.isArray(projectsData)) {
           setProjects(projectsData);
         }
       } catch (e) {
-        console.log('Error cargando proyectos:', e.message);
+        debugLogger.error('Error cargando proyectos', { error: e.message, status: e.response?.status });
       }
 
       // Cargar chat general
       try {
+        debugLogger.api('Cargando chat general...');
         const generalData = await chatApi.getGeneralChat();
+        debugLogger.api('Chat general recibido', { hasId: !!generalData?.id, data: generalData });
         if (generalData && generalData.id) {
           setGeneralChat(generalData);
         }
       } catch (e) {
-        console.log('Chat general no disponible');
+        debugLogger.error('Error chat general', { error: e.message, status: e.response?.status });
       }
     } catch (error) {
-      console.error('Error general:', error);
+      debugLogger.error('Error general en loadData', { error: error.message });
       setError('Error al cargar datos');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      debugLogger.api('loadData() finalizado', { users: users.length, conversations: conversations.length });
     }
   };
 
@@ -341,6 +366,62 @@ const ChatListScreen = () => {
           }
         />
       )}
+
+      {/* Boton flotante de Debug */}
+      <TouchableOpacity
+        style={styles.debugButton}
+        onPress={() => setShowDebug(true)}
+      >
+        <Ionicons name="bug" size={24} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Modal de Debug */}
+      <Modal
+        visible={showDebug}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowDebug(false)}
+      >
+        <View style={styles.debugModal}>
+          <View style={styles.debugHeader}>
+            <Text style={styles.debugTitle}>Debug Logs</Text>
+            <View style={styles.debugActions}>
+              <TouchableOpacity onPress={() => debugLogger.clear()} style={styles.debugClearBtn}>
+                <Text style={styles.debugClearText}>Limpiar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowDebug(false)}>
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          <ScrollView style={styles.debugContent}>
+            {debugLogs.length === 0 ? (
+              <Text style={styles.debugEmpty}>No hay logs aun</Text>
+            ) : (
+              debugLogs.map((log) => (
+                <View key={log.id} style={styles.debugLogItem}>
+                  <View style={styles.debugLogHeader}>
+                    <Text style={[
+                      styles.debugCategory,
+                      log.category === 'ERROR' && styles.debugCategoryError,
+                      log.category === 'AUTH' && styles.debugCategoryAuth,
+                      log.category === 'STORAGE' && styles.debugCategoryStorage,
+                      log.category === 'API' && styles.debugCategoryApi,
+                    ]}>
+                      [{log.category}]
+                    </Text>
+                    <Text style={styles.debugTime}>{log.timestamp}</Text>
+                  </View>
+                  <Text style={styles.debugMessage}>{log.message}</Text>
+                  {log.data && (
+                    <Text style={styles.debugData}>{log.data}</Text>
+                  )}
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -383,6 +464,101 @@ const styles = StyleSheet.create({
   errorContainer: { padding: 16, alignItems: 'center' },
   errorText: { color: '#ef4444', fontSize: 14 },
   retryText: { color: '#6366f1', fontSize: 14, marginTop: 8 },
+  // Debug styles
+  debugButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  debugModal: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    marginTop: 50,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  debugHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  debugTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  debugActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  debugClearBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#334155',
+    borderRadius: 6,
+  },
+  debugClearText: {
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  debugContent: {
+    flex: 1,
+    padding: 12,
+  },
+  debugEmpty: {
+    color: '#6b7280',
+    textAlign: 'center',
+    marginTop: 40,
+  },
+  debugLogItem: {
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  debugLogHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  debugCategory: {
+    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  debugCategoryError: { color: '#ef4444' },
+  debugCategoryAuth: { color: '#22c55e' },
+  debugCategoryStorage: { color: '#f59e0b' },
+  debugCategoryApi: { color: '#3b82f6' },
+  debugTime: {
+    color: '#6b7280',
+    fontSize: 10,
+  },
+  debugMessage: {
+    color: '#fff',
+    fontSize: 13,
+  },
+  debugData: {
+    color: '#9ca3af',
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: 'monospace',
+  },
 });
 
 export default ChatListScreen;
