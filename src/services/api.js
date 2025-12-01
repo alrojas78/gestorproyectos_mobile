@@ -24,11 +24,14 @@ api.interceptors.request.use(
 );
 
 // Interceptor para manejar errores de autenticación
+// NOTA: No borramos el token automáticamente en 401 porque puede causar
+// problemas de timing. El logout explícito lo maneja AuthContext.
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Solo logear el error, no borrar el token automáticamente
     if (error.response?.status === 401) {
-      await storage.deleteItemAsync('authToken');
+      console.log('[API] Error 401 en:', error.config?.url);
     }
     return Promise.reject(error);
   }
