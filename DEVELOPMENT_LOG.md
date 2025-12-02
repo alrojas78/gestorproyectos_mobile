@@ -11,11 +11,97 @@
 
 ---
 
-## ULTIMO FIX (2025-12-02 03:00 UTC) - WEBSOCKET TIEMPO REAL COMPLETO
+## PROBLEMA PENDIENTE (2025-12-02 03:30 UTC) - ARQUITECTURA DE MENSAJES
 
-### Build en Progreso
+### Estado: REQUIERE CORRECCION
+
+### Descripcion del Problema
+Los mensajes enviados desde la app **se guardan correctamente** en la base de datos (via API REST),
+pero **NO se emiten en tiempo real** a otros clientes.
+
+### Diagnostico Realizado
+Al revisar los logs del WebSocket (`pm2 logs websocket-chat`), el mensaje "Hola mundo dos"
+enviado desde la app **NO aparece** en los logs del servidor WebSocket.
+
+Esto confirma que:
+1. La app envia mensajes via **API REST** (PHP backend) - FUNCIONA
+2. El mensaje se guarda en la base de datos - FUNCIONA
+3. Pero el **WebSocket server (Node.js) NO es notificado** - NO FUNCIONA
+4. Por lo tanto, otros clientes no reciben el mensaje en tiempo real
+
+### Causa Raiz
+Hay **DOS sistemas separados** que no se comunican:
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   App Movil     │────>│  Backend PHP     │────>│   MySQL DB      │
+│  (React Native) │     │  (API REST)      │     │                 │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                              │
+                              │ NO HAY CONEXION
+                              ▼
+┌─────────────────┐     ┌──────────────────┐
+│   Frontend Web  │<───>│  WebSocket       │
+│   (React)       │     │  Server (Node)   │
+└─────────────────┘     └──────────────────┘
+```
+
+**El Backend PHP no notifica al WebSocket Server cuando se guarda un mensaje.**
+
+### Solucion Requerida (Opciones)
+
+#### Opcion A: App envia SOLO por WebSocket (Recomendada)
+Modificar `ChatConversationScreen.js` para que la app envie mensajes **solo via WebSocket**,
+igual que la web. El WebSocket server ya guarda en DB y emite a todos.
+
+```javascript
+// ACTUAL (incorrecto)
+const response = await chatApi.sendMessage(conversationId, messageText); // API REST
+if (socketService.isConnected()) {
+  socketService.sendMessage(conversationId, messageText); // WebSocket (redundante)
+}
+
+// CORRECTO
+socketService.sendMessage(conversationId, messageText); // Solo WebSocket
+```
+
+#### Opcion B: Backend PHP notifica a WebSocket
+Modificar el backend PHP para que cuando guarde un mensaje,
+notifique al servidor WebSocket via HTTP o Redis pub/sub.
+
+### Archivos a Modificar
+
+**Para Opcion A (recomendada):**
+- `/var/www/d.ateneo.co/mobile-app/src/screens/ChatConversationScreen.js`
+  - Cambiar `sendMessage()` para usar solo WebSocket
+  - Agregar manejo de errores si WebSocket falla
+
+### Verificacion del Problema
+1. Enviar mensaje desde app
+2. Ejecutar: `pm2 logs websocket-chat`
+3. Si NO aparece `[SEND_MESSAGE]`, el mensaje fue por API REST, no WebSocket
+4. Si aparece `[SEND_MESSAGE]`, el WebSocket funciona
+
+---
+
+## FIX ANTERIOR (2025-12-02 03:00 UTC) - WEBSOCKET CORRECIONES
+
+### Build Completado
 **Build ID:** 47cd83dc-861b-4a4b-bca7-a3aa87eba9e4
 **URL:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios/builds/47cd83dc-861b-4a4b-bca7-a3aa87eba9e4
+
+### Logs de Diagnostico en Servidor WebSocket
+Se agregaron logs detallados al servidor para diagnosticar problemas.
+
+**Ver logs en tiempo real:**
+```bash
+pm2 logs websocket-chat
+```
+
+**Logs disponibles:**
+- `[JOIN_CONVERSATION]` - Cuando un usuario se une a una sala de chat
+- `[SEND_MESSAGE]` - Cuando se envia un mensaje
+- Cantidad de sockets en cada sala de conversacion
 
 ### Problemas Identificados
 1. **WebSocket no funcionaba en tiempo real** - Los mensajes solo aparecian al refrescar
