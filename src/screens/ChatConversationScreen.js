@@ -122,21 +122,23 @@ const ChatConversationScreen = () => {
     setMessages((prev) => [...prev, tempMessage]);
 
     try {
-      // Usar API REST para enviar (más confiable que WebSocket)
-      const response = await chatApi.sendMessage(conversationId, messageText);
-
-      // Reemplazar mensaje temporal con el real
-      if (response.success && response.message) {
-        setMessages((prev) =>
-          prev.map(msg =>
-            msg.id === tempMessage.id ? response.message : msg
-          )
-        );
-      }
-
-      // También notificar via WebSocket si está conectado
+      // IMPORTANTE: Enviar SOLO por WebSocket para que llegue en tiempo real
+      // El servidor WebSocket guarda en DB y emite a todos los clientes
       if (socketService.isConnected()) {
         socketService.sendMessage(conversationId, messageText);
+        // El mensaje real llegará via evento 'new_message' y reemplazará el temporal
+      } else {
+        // Fallback: Si WebSocket no está conectado, usar API REST
+        // (el mensaje se guardará pero otros usuarios no lo verán en tiempo real hasta refrescar)
+        console.warn('WebSocket no conectado, usando API REST como fallback');
+        const response = await chatApi.sendMessage(conversationId, messageText);
+        if (response.success && response.message) {
+          setMessages((prev) =>
+            prev.map(msg =>
+              msg.id === tempMessage.id ? response.message : msg
+            )
+          );
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);

@@ -4,83 +4,69 @@
 
 ---
 
-## Estado Actual: PENDIENTE BUILD - VERSION 1.0.3
+## Estado Actual: PENDIENTE BUILD - VERSION 1.0.4
 
-**Version anterior:** 1.0.2
-**Proxima version:** 1.0.3
+**Version anterior:** 1.0.3
+**Proxima version:** 1.0.4
 
 ---
 
-## PROBLEMA PENDIENTE (2025-12-02 03:30 UTC) - ARQUITECTURA DE MENSAJES
+## FIX APLICADO (2025-12-02 ~14:00 UTC) - MENSAJES TIEMPO REAL
 
-### Estado: REQUIERE CORRECCION
+### Estado: CORREGIDO - PENDIENTE BUILD
 
-### Descripcion del Problema
-Los mensajes enviados desde la app **se guardan correctamente** en la base de datos (via API REST),
-pero **NO se emiten en tiempo real** a otros clientes.
+### Problema Resuelto
+Los mensajes enviados desde la app **se guardaban** en la base de datos (via API REST),
+pero **NO se emitian en tiempo real** a otros clientes porque usaba API REST en lugar de WebSocket.
 
-### Diagnostico Realizado
-Al revisar los logs del WebSocket (`pm2 logs websocket-chat`), el mensaje "Hola mundo dos"
-enviado desde la app **NO aparece** en los logs del servidor WebSocket.
+### Causa Raiz Identificada
+La funcion `sendMessage()` en `ChatConversationScreen.js` hacia:
+1. **Primero** enviaba por API REST (guardaba en DB pero no notificaba WebSocket)
+2. **Despues** enviaba por WebSocket (pero el mensaje ya estaba duplicado)
 
-Esto confirma que:
-1. La app envia mensajes via **API REST** (PHP backend) - FUNCIONA
-2. El mensaje se guarda en la base de datos - FUNCIONA
-3. Pero el **WebSocket server (Node.js) NO es notificado** - NO FUNCIONA
-4. Por lo tanto, otros clientes no reciben el mensaje en tiempo real
+El Backend PHP no notificaba al WebSocket Server, causando que los mensajes no llegaran en tiempo real.
 
-### Causa Raiz
-Hay **DOS sistemas separados** que no se comunican:
+### Solucion Implementada (Opcion A)
+Se modifico `ChatConversationScreen.js` para enviar mensajes **SOLO por WebSocket**,
+con fallback a API REST si el WebSocket no esta conectado.
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   App Movil     │────>│  Backend PHP     │────>│   MySQL DB      │
-│  (React Native) │     │  (API REST)      │     │                 │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                              │
-                              │ NO HAY CONEXION
-                              ▼
-┌─────────────────┐     ┌──────────────────┐
-│   Frontend Web  │<───>│  WebSocket       │
-│   (React)       │     │  Server (Node)   │
-└─────────────────┘     └──────────────────┘
-```
-
-**El Backend PHP no notifica al WebSocket Server cuando se guarda un mensaje.**
-
-### Solucion Requerida (Opciones)
-
-#### Opcion A: App envia SOLO por WebSocket (Recomendada)
-Modificar `ChatConversationScreen.js` para que la app envie mensajes **solo via WebSocket**,
-igual que la web. El WebSocket server ya guarda en DB y emite a todos.
-
+**Codigo anterior (incorrecto):**
 ```javascript
-// ACTUAL (incorrecto)
 const response = await chatApi.sendMessage(conversationId, messageText); // API REST
 if (socketService.isConnected()) {
   socketService.sendMessage(conversationId, messageText); // WebSocket (redundante)
 }
-
-// CORRECTO
-socketService.sendMessage(conversationId, messageText); // Solo WebSocket
 ```
 
-#### Opcion B: Backend PHP notifica a WebSocket
-Modificar el backend PHP para que cuando guarde un mensaje,
-notifique al servidor WebSocket via HTTP o Redis pub/sub.
+**Codigo nuevo (correcto):**
+```javascript
+if (socketService.isConnected()) {
+  socketService.sendMessage(conversationId, messageText); // Solo WebSocket
+  // El mensaje real llegara via evento 'new_message'
+} else {
+  // Fallback: API REST si WebSocket no conectado
+  const response = await chatApi.sendMessage(conversationId, messageText);
+}
+```
 
-### Archivos a Modificar
+### Flujo Correcto Ahora
+```
+App Movil ─────> WebSocket Server ─────> MySQL DB
+                      │
+                      └─────> Emite a TODOS los clientes conectados (tiempo real)
+```
 
-**Para Opcion A (recomendada):**
-- `/var/www/d.ateneo.co/mobile-app/src/screens/ChatConversationScreen.js`
-  - Cambiar `sendMessage()` para usar solo WebSocket
-  - Agregar manejo de errores si WebSocket falla
-
-### Verificacion del Problema
-1. Enviar mensaje desde app
+### Verificacion
+1. Enviar mensaje desde app movil
 2. Ejecutar: `pm2 logs websocket-chat`
-3. Si NO aparece `[SEND_MESSAGE]`, el mensaje fue por API REST, no WebSocket
-4. Si aparece `[SEND_MESSAGE]`, el WebSocket funciona
+3. Debe aparecer `[SEND_MESSAGE]` en los logs
+4. El mensaje debe llegar en tiempo real a otros clientes (web y movil)
+
+---
+
+## PROBLEMA ANTERIOR (2025-12-02 03:30 UTC) - ARQUITECTURA DE MENSAJES
+
+### Estado: RESUELTO (ver fix arriba)
 
 ---
 
@@ -342,7 +328,8 @@ c1a387c fix: add memory cache to storage + don't auto-delete token on 401
 
 | Fecha | Version | Build ID | Estado | Cambios |
 |-------|---------|----------|--------|---------|
-| 2025-12-02 03:00 | 1.0.3 | 47cd83dc-... | EN PROGRESO | WebSocket tiempo real completo |
+| 2025-12-02 ~14:00 | 1.0.4 | PENDIENTE | PENDIENTE | Fix mensajes tiempo real (solo WebSocket) |
+| 2025-12-02 03:00 | 1.0.3 | 47cd83dc-... | OK | WebSocket tiempo real completo |
 | 2025-12-02 02:40 | 1.0.3 | a544a7ba-... | OK | UI cleanup, tabs reordenados |
 | 2025-12-02 00:32 | 1.0.2 | 5ec7fb87-... | OK | Backend auth fix |
 | 2025-12-02 00:05 | 1.0.1 | 4e01d1dc-... | OK | Debug logging interceptor |
@@ -431,7 +418,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 
 ## Roadmap de Versiones
 
-### Version 1.0.3 (Actual - Pendiente Build)
+### Version 1.0.4 (Actual - Pendiente Build)
 - [x] Login/Autenticacion
 - [x] Chat (contactos, conversaciones, proyectos, chat general)
 - [x] Tareas (listado por equipo, filtros)
@@ -445,6 +432,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 - [x] Orden de tabs corregido
 - [x] UI de debug removida
 - [x] Boton de adjuntar preparado
+- [x] **Fix mensajes tiempo real** - sendMessage ahora usa SOLO WebSocket
 - [ ] **Pendiente:** Generar APK y validar
 
 ### Version 1.1.0 (Proxima)
