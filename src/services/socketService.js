@@ -1,17 +1,24 @@
 import { io } from 'socket.io-client';
-import * as SecureStore from 'expo-secure-store';
+import storage from './storage';
+import debugLogger from './debugLogger';
 
 const SOCKET_URL = 'https://d.ateneo.co';
 
 class SocketService {
   socket = null;
   listeners = new Map();
+  isConnecting = false;
 
   async connect() {
-    if (this.socket?.connected) return;
+    if (this.socket?.connected || this.isConnecting) return;
 
-    const token = await SecureStore.getItemAsync('authToken');
-    if (!token) return;
+    this.isConnecting = true;
+    const token = await storage.getItemAsync('authToken');
+    debugLogger.socket('Intentando conectar', { hasToken: !!token });
+    if (!token) {
+      this.isConnecting = false;
+      return;
+    }
 
     this.socket = io(SOCKET_URL, {
       auth: { token },
@@ -22,16 +29,22 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected');
+      debugLogger.socket('Socket conectado');
+      this.isConnecting = false;
     });
 
     this.socket.on('disconnect', () => {
-      console.log('Socket disconnected');
+      debugLogger.socket('Socket desconectado');
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
+      debugLogger.error('Socket connection error', { error: error.message });
+      this.isConnecting = false;
     });
+  }
+
+  isConnected() {
+    return this.socket?.connected || false;
   }
 
   disconnect() {

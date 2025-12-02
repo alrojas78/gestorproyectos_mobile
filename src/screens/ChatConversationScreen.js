@@ -85,10 +85,44 @@ const ChatConversationScreen = () => {
     setInputText('');
     setIsSending(true);
 
+    // Crear mensaje temporal para mostrar inmediatamente
+    const tempMessage = {
+      id: `temp_${Date.now()}`,
+      content: messageText,
+      sender_id: user?.id,
+      sender_name: user?.name || 'Yo',
+      created_at: new Date().toISOString(),
+      sending: true,
+    };
+
+    // Agregar mensaje temporal a la lista
+    setMessages((prev) => [...prev, tempMessage]);
+
     try {
-      socketService.sendMessage(conversationId, messageText);
+      // Usar API REST para enviar (más confiable que WebSocket)
+      const response = await chatApi.sendMessage(conversationId, messageText);
+
+      // Reemplazar mensaje temporal con el real
+      if (response.success && response.message) {
+        setMessages((prev) =>
+          prev.map(msg =>
+            msg.id === tempMessage.id ? response.message : msg
+          )
+        );
+      }
+
+      // También notificar via WebSocket si está conectado
+      if (socketService.isConnected()) {
+        socketService.sendMessage(conversationId, messageText);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Marcar mensaje como fallido
+      setMessages((prev) =>
+        prev.map(msg =>
+          msg.id === tempMessage.id ? { ...msg, sending: false, failed: true } : msg
+        )
+      );
       setInputText(messageText);
     } finally {
       setIsSending(false);
