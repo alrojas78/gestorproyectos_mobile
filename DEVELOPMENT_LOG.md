@@ -1,18 +1,60 @@
 # Informe de Seguimiento - App Movil Gestion de Proyectos
 
-## Fecha: 2025-12-02 (Actualizado: 00:35 UTC)
+## Fecha: 2025-12-02 (Actualizado: 02:30 UTC)
 
 ---
 
-## Estado Actual: BUILD EN PROGRESO - VERSION 1.0.2
+## Estado Actual: PENDIENTE BUILD - VERSION 1.0.3
 
-**Build ID:** 5ec7fb87-2e2a-4766-95ec-555ca8e56413
-**Version:** 1.0.2
-**URL:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios/builds/5ec7fb87-2e2a-4766-95ec-555ca8e56413
+**Version anterior:** 1.0.2
+**Proxima version:** 1.0.3
 
 ---
 
-## ULTIMO FIX (2025-12-02 00:30 UTC) - PROBLEMA DE CHAT RESUELTO
+## ULTIMO FIX (2025-12-02 02:30 UTC) - WEBSOCKET Y MEJORAS UI
+
+### Problemas Identificados
+1. **WebSocket no funcionaba en tiempo real** - Los mensajes solo aparecian al refrescar
+2. **URL del WebSocket incorrecta** - Faltaba el puerto 3001
+3. **Listeners del socket no se registraban** - Se registraban antes de conectar
+4. **Orden de tabs incorrecto** - Era Chat, Nueva Tarea, Tareas, Perfil
+5. **Boton de debug visible** - Ya no es necesario
+
+### Soluciones Implementadas
+
+#### 1. socketService.js - Correccion WebSocket
+```javascript
+// ANTES: URL incorrecta
+const SOCKET_URL = 'https://d.ateneo.co';
+
+// DESPUES: URL correcta con puerto
+const SOCKET_URL = 'https://d.ateneo.co:3001';
+```
+
+Tambien se agrego:
+- `pendingListeners` para guardar listeners antes de conectar
+- Transports: `['websocket', 'polling']` para fallback
+- Mejores intentos de reconexion (10 intentos)
+
+#### 2. ChatListScreen.js - Eliminado Debug UI
+- Removido boton flotante de debug (bug rojo)
+- Removido modal de logs
+- Limpieza de imports y estados no usados
+
+#### 3. AppNavigator.js - Orden de Tabs Corregido
+```javascript
+// ANTES: Chat, Nueva Tarea, Tareas, Perfil
+// DESPUES: Chat, Tareas, Nueva Tarea, Perfil
+```
+
+#### 4. ChatConversationScreen.js - Mejora Input
+- Agregado boton de adjuntar archivos (preparacion para proxima version)
+- Diseño mas compacto del area de input
+- Listo para implementar adjuntos
+
+---
+
+## FIX ANTERIOR (2025-12-02 00:30 UTC) - PROBLEMA DE CHAT RESUELTO
 
 ### Sintomas Reportados (evidencia7.jpg, evidencia8.jpg, evidencia9.jpg)
 - Proyectos: FUNCIONAN ✅
@@ -165,7 +207,8 @@ c1a387c fix: add memory cache to storage + don't auto-delete token on 401
 
 | Fecha | Version | Build ID | Estado | Cambios |
 |-------|---------|----------|--------|---------|
-| 2025-12-02 00:32 | 1.0.2 | 5ec7fb87-... | EN PROGRESO | Backend auth fix |
+| 2025-12-02 02:30 | 1.0.3 | PENDIENTE | - | WebSocket fix, UI cleanup |
+| 2025-12-02 00:32 | 1.0.2 | 5ec7fb87-... | OK | Backend auth fix |
 | 2025-12-02 00:05 | 1.0.1 | 4e01d1dc-... | OK | Debug logging interceptor |
 | 2025-12-01 23:51 | 1.0.0 | ... | OK | Memory cache + fix interceptor 401 |
 
@@ -252,7 +295,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 
 ## Roadmap de Versiones
 
-### Version 1.0.2 (Actual - En Build)
+### Version 1.0.3 (Actual - Pendiente Build)
 - [x] Login/Autenticacion
 - [x] Chat (contactos, conversaciones, proyectos, chat general)
 - [x] Tareas (listado por equipo, filtros)
@@ -261,14 +304,22 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 - [x] Compatibilidad web para debug
 - [x] Memory cache para token
 - [x] Fix backend Authorization header
-- [ ] **Pendiente:** Validar funcionamiento en APK
+- [x] Fix WebSocket URL (puerto 3001)
+- [x] Fix listeners del socket
+- [x] Orden de tabs corregido
+- [x] UI de debug removida
+- [x] Boton de adjuntar preparado
+- [ ] **Pendiente:** Generar APK y validar
+
+### Version 1.1.0 (Proxima)
+- [ ] Adjuntar archivos en chat
+- [ ] Notificaciones push
 
 ### Version 2.0 (Planificada)
 - [ ] Llamadas de audio (WebRTC)
 - [ ] Videollamadas
 - [ ] Llamadas grupales
 - [ ] Compartir pantalla
-- [ ] Notificaciones push
 
 ---
 

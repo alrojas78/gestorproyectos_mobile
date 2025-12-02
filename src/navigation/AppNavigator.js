@@ -81,14 +81,14 @@ const MainTabs = () => (
       options={{ tabBarLabel: 'Chats' }}
     />
     <Tab.Screen
-      name="CreateTask"
-      component={CreateTaskScreen}
-      options={{ tabBarLabel: 'Nueva Tarea' }}
-    />
-    <Tab.Screen
       name="Tasks"
       component={TasksStack}
       options={{ tabBarLabel: 'Tareas' }}
+    />
+    <Tab.Screen
+      name="CreateTask"
+      component={CreateTaskScreen}
+      options={{ tabBarLabel: 'Nueva Tarea' }}
     />
     <Tab.Screen
       name="Profile"

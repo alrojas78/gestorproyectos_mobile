@@ -2,19 +2,20 @@ import { io } from 'socket.io-client';
 import storage from './storage';
 import debugLogger from './debugLogger';
 
-const SOCKET_URL = 'https://d.ateneo.co';
+const SOCKET_URL = 'https://d.ateneo.co:3001';
 
 class SocketService {
   socket = null;
   listeners = new Map();
   isConnecting = false;
+  pendingListeners = []; // Listeners que se registran antes de conectar
 
   async connect() {
     if (this.socket?.connected || this.isConnecting) return;
 
     this.isConnecting = true;
     const token = await storage.getItemAsync('authToken');
-    debugLogger.socket('Intentando conectar', { hasToken: !!token });
+    debugLogger.socket('Intentando conectar WebSocket', { hasToken: !!token, url: SOCKET_URL });
     if (!token) {
       this.isConnecting = false;
       return;
@@ -22,19 +23,24 @@ class SocketService {
 
     this.socket = io(SOCKET_URL, {
       auth: { token },
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 5000,
     });
 
     this.socket.on('connect', () => {
-      debugLogger.socket('Socket conectado');
+      debugLogger.socket('Socket conectado', { id: this.socket.id });
       this.isConnecting = false;
+      // Registrar listeners pendientes
+      this.pendingListeners.forEach(({ event, callback }) => {
+        this.socket.on(event, callback);
+      });
     });
 
-    this.socket.on('disconnect', () => {
-      debugLogger.socket('Socket desconectado');
+    this.socket.on('disconnect', (reason) => {
+      debugLogger.socket('Socket desconectado', { reason });
     });
 
     this.socket.on('connect_error', (error) => {
@@ -89,24 +95,32 @@ class SocketService {
   }
 
   on(event, callback) {
-    if (this.socket) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push(callback);
+
+    if (this.socket?.connected) {
       this.socket.on(event, callback);
-      if (!this.listeners.has(event)) {
-        this.listeners.set(event, []);
-      }
-      this.listeners.get(event).push(callback);
+    } else {
+      // Guardar para registrar cuando se conecte
+      this.pendingListeners.push({ event, callback });
     }
   }
 
   off(event, callback) {
     if (this.socket) {
       this.socket.off(event, callback);
-      const eventListeners = this.listeners.get(event);
-      if (eventListeners) {
-        const index = eventListeners.indexOf(callback);
-        if (index > -1) {
-          eventListeners.splice(index, 1);
-        }
+    }
+    // Remover de listeners pendientes
+    this.pendingListeners = this.pendingListeners.filter(
+      (l) => !(l.event === event && l.callback === callback)
+    );
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      const index = eventListeners.indexOf(callback);
+      if (index > -1) {
+        eventListeners.splice(index, 1);
       }
     }
   }

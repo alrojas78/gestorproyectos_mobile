@@ -214,6 +214,9 @@ const ChatConversationScreen = () => {
 
       {/* Input Area */}
       <View style={styles.inputArea}>
+        <TouchableOpacity style={styles.attachButton}>
+          <Ionicons name="attach" size={24} color="#6b7280" />
+        </TouchableOpacity>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -348,19 +351,26 @@ const styles = StyleSheet.create({
   inputArea: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     backgroundColor: '#1e293b',
     borderTopWidth: 1,
     borderTopColor: '#334155',
   },
+  attachButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
   inputContainer: {
     flex: 1,
     backgroundColor: '#0f172a',
-    borderRadius: 24,
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    marginRight: 10,
+    marginRight: 8,
     maxHeight: 100,
   },
   input: {
@@ -369,9 +379,9 @@ const styles = StyleSheet.create({
     maxHeight: 80,
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',

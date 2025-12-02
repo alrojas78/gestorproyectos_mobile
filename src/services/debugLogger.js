@@ -67,6 +67,10 @@ class DebugLogger {
     this.log('API', message, data);
   }
 
+  socket(message, data = null) {
+    this.log('SOCKET', message, data);
+  }
+
   error(message, data = null) {
     this.log('ERROR', message, data);
   }
