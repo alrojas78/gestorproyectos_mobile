@@ -11,46 +11,95 @@
 
 ---
 
-## ULTIMO FIX (2025-12-02 02:30 UTC) - WEBSOCKET Y MEJORAS UI
+## ULTIMO FIX (2025-12-02 03:00 UTC) - WEBSOCKET TIEMPO REAL COMPLETO
+
+### Build en Progreso
+**Build ID:** 47cd83dc-861b-4a4b-bca7-a3aa87eba9e4
+**URL:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios/builds/47cd83dc-861b-4a4b-bca7-a3aa87eba9e4
 
 ### Problemas Identificados
 1. **WebSocket no funcionaba en tiempo real** - Los mensajes solo aparecian al refrescar
 2. **URL del WebSocket incorrecta** - Faltaba el puerto 3001
-3. **Listeners del socket no se registraban** - Se registraban antes de conectar
-4. **Orden de tabs incorrecto** - Era Chat, Nueva Tarea, Tareas, Perfil
-5. **Boton de debug visible** - Ya no es necesario
+3. **Campos con formato incorrecto** - App usaba snake_case, servidor espera camelCase
+4. **Handler de mensajes incorrecto** - Esperaba `data.message` pero servidor envia mensaje directo
+5. **Evento typing incorrecto** - Usaba `user_typing` pero servidor emite `typing`
+6. **Orden de mensajes invertido** - Se hacia reverse() innecesario
+7. **join_conversation se perdia** - Se llamaba antes de que socket conectara
 
 ### Soluciones Implementadas
 
-#### 1. socketService.js - Correccion WebSocket
-```javascript
-// ANTES: URL incorrecta
-const SOCKET_URL = 'https://d.ateneo.co';
+#### 1. socketService.js - Correccion Completa WebSocket
 
-// DESPUES: URL correcta con puerto
+**URL corregida:**
+```javascript
 const SOCKET_URL = 'https://d.ateneo.co:3001';
 ```
 
-Tambien se agrego:
-- `pendingListeners` para guardar listeners antes de conectar
-- Transports: `['websocket', 'polling']` para fallback
-- Mejores intentos de reconexion (10 intentos)
-
-#### 2. ChatListScreen.js - Eliminado Debug UI
-- Removido boton flotante de debug (bug rojo)
-- Removido modal de logs
-- Limpieza de imports y estados no usados
-
-#### 3. AppNavigator.js - Orden de Tabs Corregido
+**Campos cambiados a camelCase (como espera el servidor):**
 ```javascript
-// ANTES: Chat, Nueva Tarea, Tareas, Perfil
-// DESPUES: Chat, Tareas, Nueva Tarea, Perfil
+// ANTES (incorrecto)
+this.socket.emit('send_message', { conversation_id, content, message_type });
+
+// DESPUES (correcto)
+this.socket.emit('send_message', { conversationId, content, messageType });
 ```
 
-#### 4. ChatConversationScreen.js - Mejora Input
-- Agregado boton de adjuntar archivos (preparacion para proxima version)
-- Diseño mas compacto del area de input
-- Listo para implementar adjuntos
+**Cola de emits pendientes (nuevo):**
+```javascript
+pendingEmits = []; // Guarda join_conversation, send_message cuando no hay conexion
+
+joinConversation(conversationId) {
+  if (this.socket?.connected) {
+    this.socket.emit('join_conversation', { conversationId });
+  } else {
+    // Guardar para ejecutar cuando se conecte
+    this.pendingEmits.push({ event: 'join_conversation', data: { conversationId } });
+    this.connect(); // Intentar conectar
+  }
+}
+```
+
+#### 2. ChatConversationScreen.js - Handler de Mensajes Corregido
+
+**Handler new_message corregido:**
+```javascript
+// ANTES (incorrecto)
+const handleNewMessage = (data) => {
+  if (data.conversation_id === conversationId) {
+    setMessages((prev) => [...prev, data.message]);
+  }
+};
+
+// DESPUES (correcto)
+const handleNewMessage = (message) => {
+  const msgConversationId = message.conversationId || message.conversation_id;
+  if (String(msgConversationId) === String(conversationId)) {
+    // Deteccion de duplicados incluida
+    setMessages((prev) => [...prev, message]);
+  }
+};
+```
+
+**Evento typing corregido:**
+```javascript
+// ANTES: socketService.on('user_typing', handleTyping);
+// DESPUES: socketService.on('typing', handleTyping);
+```
+
+**Orden de mensajes:**
+```javascript
+// ANTES: setMessages(data.reverse()); // INCORRECTO
+// DESPUES: setMessages(data); // Backend ya ordena cronologicamente
+```
+
+#### 3. Mejoras UI (del fix anterior)
+- Boton de debug removido
+- Orden de tabs: Chat, Tareas, Nueva Tarea, Perfil
+- Boton de adjuntar preparado en input
+
+---
+
+## FIX ANTERIOR (2025-12-02 02:30 UTC) - UI Y NAVEGACION
 
 ---
 
@@ -207,7 +256,8 @@ c1a387c fix: add memory cache to storage + don't auto-delete token on 401
 
 | Fecha | Version | Build ID | Estado | Cambios |
 |-------|---------|----------|--------|---------|
-| 2025-12-02 02:30 | 1.0.3 | PENDIENTE | - | WebSocket fix, UI cleanup |
+| 2025-12-02 03:00 | 1.0.3 | 47cd83dc-... | EN PROGRESO | WebSocket tiempo real completo |
+| 2025-12-02 02:40 | 1.0.3 | a544a7ba-... | OK | UI cleanup, tabs reordenados |
 | 2025-12-02 00:32 | 1.0.2 | 5ec7fb87-... | OK | Backend auth fix |
 | 2025-12-02 00:05 | 1.0.1 | 4e01d1dc-... | OK | Debug logging interceptor |
 | 2025-12-01 23:51 | 1.0.0 | ... | OK | Memory cache + fix interceptor 401 |
