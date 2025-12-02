@@ -1,5 +1,6 @@
 import axios from 'axios';
 import storage from './storage';
+import debugLogger from './debugLogger';
 
 const API_BASE_URL = 'https://d.ateneo.co/backend/api';
 
@@ -14,13 +15,30 @@ const api = axios.create({
 // Interceptor para agregar el token JWT a todas las solicitudes
 api.interceptors.request.use(
   async (config) => {
-    const token = await storage.getItemAsync('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await storage.getItemAsync('authToken');
+      debugLogger.api(`Interceptor - Token obtenido`, {
+        hasToken: !!token,
+        tokenLength: token?.length,
+        url: config.url
+      });
+
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+        debugLogger.api(`Interceptor - Header Authorization agregado`);
+      } else {
+        debugLogger.api(`Interceptor - Sin token, request sin auth`);
+      }
+    } catch (error) {
+      debugLogger.error(`Interceptor - Error obteniendo token`, { error: error.message });
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    debugLogger.error(`Interceptor request error`, { error: error.message });
+    return Promise.reject(error);
+  }
 );
 
 // Interceptor para manejar errores de autenticación

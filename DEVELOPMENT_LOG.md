@@ -1,14 +1,57 @@
 # Informe de Seguimiento - App Movil Gestion de Proyectos
 
-## Fecha: 2025-12-01 (Actualizado: 21:55 UTC)
+## Fecha: 2025-12-01 (Actualizado: 23:51 UTC)
 
 ---
 
 ## Estado Actual: BUILD EN COLA
 
-**Build ID:** 002b4410-f7b6-4483-befc-0b03f19353d8
-**Commit:** b03386e
-**URL:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios/builds/002b4410-f7b6-4483-befc-0b03f19353d8
+**Build ID:** 4e01d1dc-6652-44df-a073-3368d0df129c
+**Commit:** c1a387c
+**URL:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios/builds/4e01d1dc-6652-44df-a073-3368d0df129c
+
+---
+
+## Ultimo Fix (2025-12-01 23:51 UTC)
+
+### Problema Detectado en APK
+Despues de compilar con el fix de storage wrapper, el APK seguia mostrando errores 401.
+
+### Analisis de Logs de Debug (evidencia1.jpg, evidencia2.jpg)
+Los logs mostraron claramente el problema:
+1. Login exitoso - token recibido del servidor
+2. `setItemAsync` llamado para guardar token
+3. Inmediatamente despues `getItemAsync` retorna `hasValue: false`
+4. Las llamadas API van sin token -> Error 401
+5. El interceptor de 401 borraba el token automaticamente (empeorando el problema)
+
+### Causa Raiz
+**Problema de timing con SecureStore en Android.** El `setItemAsync` de expo-secure-store es asincrono y no garantiza que el valor este disponible inmediatamente para `getItemAsync`. Esto es especialmente problematico con `newArchEnabled: true`.
+
+### Solucion Implementada
+
+#### 1. storage.js - Memory Cache Layer
+Se agrego una capa de cache en memoria que:
+- Guarda el valor en memoria INMEDIATAMENTE en `setItemAsync`
+- `getItemAsync` primero busca en memoria, luego en SecureStore
+- Esto garantiza acceso instantaneo al token despues del login
+
+```javascript
+const memoryCache = {};
+
+// En setItemAsync:
+memoryCache[key] = value;  // Instantaneo
+await SecureStore.setItemAsync(key, value);  // Async
+
+// En getItemAsync:
+if (memoryCache[key]) return memoryCache[key];  // Cache hit
+return await SecureStore.getItemAsync(key);  // Fallback
+```
+
+#### 2. api.js - Interceptor 401 Fix
+Se elimino el borrado automatico del token en errores 401:
+- Antes: Cualquier 401 borraba el token inmediatamente
+- Ahora: Solo se loguea el error, el logout explicito maneja el borrado
 
 ---
 
@@ -194,7 +237,8 @@ curl -s "https://d.ateneo.co/backend/api/users/online-status" \
 
 | Fecha | Build ID | Commit | Estado | Cambios |
 |-------|----------|--------|--------|---------|
-| 2025-12-01 21:55 | 002b4410-... | b03386e | EN COLA | Fix storage wrapper + commit git |
+| 2025-12-01 23:51 | 4e01d1dc-... | c1a387c | EN COLA | Memory cache + fix interceptor 401 |
+| 2025-12-01 21:55 | 002b4410-... | b03386e | PENDIENTE | Fix storage wrapper + commit git |
 | 2025-12-01 21:45 | 27b5c295-... | 8cb3d5c | CANCELADO | Cambios no commiteados |
 | 2025-12-01 19:03 | ad759840-... | 8cb3d5c | OK | Fix screens (sin storage wrapper) |
 | 2025-12-01 18:43 | 4d87f0e7-... | 8cb3d5c | OK | Primer intento |
