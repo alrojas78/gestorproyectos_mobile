@@ -34,15 +34,37 @@ const ChatConversationScreen = () => {
     loadMessages();
     socketService.joinConversation(conversationId);
 
-    const handleNewMessage = (data) => {
-      if (data.conversation_id === conversationId) {
-        setMessages((prev) => [...prev, data.message]);
+    // El servidor emite el mensaje completo con conversationId incluido
+    const handleNewMessage = (message) => {
+      // El servidor envía: { ...messageData, conversationId }
+      const msgConversationId = message.conversationId || message.conversation_id;
+
+      if (String(msgConversationId) === String(conversationId)) {
+        // Evitar duplicados (por si ya lo agregamos como mensaje temporal)
+        setMessages((prev) => {
+          const exists = prev.some(m =>
+            m.id === message.id ||
+            (m.content === message.content && m.sender_id === message.sender_id && m.sending)
+          );
+          if (exists) {
+            // Reemplazar mensaje temporal con el real
+            return prev.map(m =>
+              (m.sending && m.content === message.content && m.sender_id === message.sender_id)
+                ? message
+                : m
+            );
+          }
+          return [...prev, message];
+        });
         socketService.markRead(conversationId);
       }
     };
 
     const handleTyping = (data) => {
-      if (data.conversation_id === conversationId && data.user_id !== user?.id) {
+      const typingConversationId = data.conversationId || data.conversation_id;
+      const typingUserId = data.userId || data.user_id;
+
+      if (String(typingConversationId) === String(conversationId) && typingUserId !== user?.id) {
         setIsTyping(true);
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
@@ -54,22 +76,23 @@ const ChatConversationScreen = () => {
     };
 
     socketService.on('new_message', handleNewMessage);
-    socketService.on('user_typing', handleTyping);
+    socketService.on('typing', handleTyping);
 
     return () => {
       socketService.leaveConversation(conversationId);
       socketService.off('new_message', handleNewMessage);
-      socketService.off('user_typing', handleTyping);
+      socketService.off('typing', handleTyping);
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [conversationId]);
+  }, [conversationId, user?.id]);
 
   const loadMessages = async () => {
     try {
       const data = await chatApi.getMessages(conversationId, { limit: 50 });
-      setMessages(data.reverse());
+      // El backend ya devuelve los mensajes en orden cronológico (más antiguo primero)
+      setMessages(Array.isArray(data) ? data : []);
       chatApi.markAsRead(conversationId);
     } catch (error) {
       console.error('Error loading messages:', error);

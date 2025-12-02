@@ -9,6 +9,7 @@ class SocketService {
   listeners = new Map();
   isConnecting = false;
   pendingListeners = []; // Listeners que se registran antes de conectar
+  pendingEmits = []; // Emits pendientes (ej: join_conversation)
 
   async connect() {
     if (this.socket?.connected || this.isConnecting) return;
@@ -33,10 +34,19 @@ class SocketService {
     this.socket.on('connect', () => {
       debugLogger.socket('Socket conectado', { id: this.socket.id });
       this.isConnecting = false;
-      // Registrar listeners pendientes
+
+      // 1. Registrar listeners pendientes
       this.pendingListeners.forEach(({ event, callback }) => {
         this.socket.on(event, callback);
       });
+      this.pendingListeners = [];
+
+      // 2. Ejecutar emits pendientes (ej: join_conversation)
+      this.pendingEmits.forEach(({ event, data }) => {
+        this.socket.emit(event, data);
+        debugLogger.socket('Emit pendiente ejecutado', { event, data });
+      });
+      this.pendingEmits = [];
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -61,36 +71,51 @@ class SocketService {
   }
 
   joinConversation(conversationId) {
+    const data = { conversationId };
     if (this.socket?.connected) {
-      this.socket.emit('join_conversation', { conversation_id: conversationId });
+      this.socket.emit('join_conversation', data);
+      debugLogger.socket('join_conversation emitido', data);
+    } else {
+      // Guardar para ejecutar cuando se conecte
+      this.pendingEmits.push({ event: 'join_conversation', data });
+      debugLogger.socket('join_conversation guardado en pendientes', data);
+      // Intentar conectar si no está conectando
+      if (!this.isConnecting) {
+        this.connect();
+      }
     }
   }
 
   leaveConversation(conversationId) {
     if (this.socket?.connected) {
-      this.socket.emit('leave_conversation', { conversation_id: conversationId });
+      this.socket.emit('leave_conversation', { conversationId });
     }
   }
 
   sendMessage(conversationId, content, messageType = 'text') {
+    const data = { conversationId, content, messageType };
     if (this.socket?.connected) {
-      this.socket.emit('send_message', {
-        conversation_id: conversationId,
-        content,
-        message_type: messageType,
-      });
+      this.socket.emit('send_message', data);
+      debugLogger.socket('send_message emitido', { conversationId, content: content.substring(0, 20) });
+    } else {
+      // Guardar para ejecutar cuando se conecte
+      this.pendingEmits.push({ event: 'send_message', data });
+      debugLogger.socket('send_message guardado en pendientes', { conversationId });
+      if (!this.isConnecting) {
+        this.connect();
+      }
     }
   }
 
-  sendTyping(conversationId) {
+  sendTyping(conversationId, isTyping = true) {
     if (this.socket?.connected) {
-      this.socket.emit('typing', { conversation_id: conversationId });
+      this.socket.emit('typing', { conversationId, isTyping });
     }
   }
 
   markRead(conversationId) {
     if (this.socket?.connected) {
-      this.socket.emit('mark_read', { conversation_id: conversationId });
+      this.socket.emit('mark_read', { conversationId });
     }
   }
 
