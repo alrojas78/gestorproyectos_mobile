@@ -2,7 +2,10 @@ import { io } from 'socket.io-client';
 import storage from './storage';
 import debugLogger from './debugLogger';
 
-const SOCKET_URL = 'https://d.ateneo.co:3001';
+// IMPORTANTE: Usar wss://d.ateneo.co (sin puerto) para pasar por el proxy de Apache
+// El proxy de Apache redirige /socket.io a localhost:3001
+// Usar el puerto directamente (3001) no funciona porque el servidor no tiene SSL
+const SOCKET_URL = 'wss://d.ateneo.co';
 
 class SocketService {
   socket = null;
@@ -116,6 +119,76 @@ class SocketService {
   markRead(conversationId) {
     if (this.socket?.connected) {
       this.socket.emit('mark_read', { conversationId });
+    }
+  }
+
+  // =====================================================
+  // EVENTOS DE SOPORTE
+  // =====================================================
+
+  // Conectar como agente de soporte
+  connectAsAgent() {
+    if (this.socket?.connected) {
+      this.socket.emit('support_agent_connect');
+      debugLogger.socket('support_agent_connect emitido');
+    } else {
+      this.pendingEmits.push({ event: 'support_agent_connect', data: {} });
+      debugLogger.socket('support_agent_connect guardado en pendientes');
+      if (!this.isConnecting) {
+        this.connect();
+      }
+    }
+  }
+
+  // Unirse a una sesión de soporte
+  joinSupportSession(sessionId) {
+    const data = { sessionId };
+    if (this.socket?.connected) {
+      this.socket.emit('support_join_session', data);
+      debugLogger.socket('support_join_session emitido', data);
+    } else {
+      this.pendingEmits.push({ event: 'support_join_session', data });
+      debugLogger.socket('support_join_session guardado en pendientes', data);
+      if (!this.isConnecting) {
+        this.connect();
+      }
+    }
+  }
+
+  // Salir de una sesión de soporte
+  leaveSupportSession(sessionId) {
+    if (this.socket?.connected) {
+      this.socket.emit('support_leave_session', { sessionId });
+    }
+  }
+
+  // Enviar mensaje de soporte
+  sendSupportMessage(sessionId, content, messageType = 'text') {
+    const data = { sessionId, content, messageType };
+    if (this.socket?.connected) {
+      this.socket.emit('support_message', data);
+      debugLogger.socket('support_message emitido', { sessionId, content: content.substring(0, 20) });
+    } else {
+      this.pendingEmits.push({ event: 'support_message', data });
+      debugLogger.socket('support_message guardado en pendientes', { sessionId });
+      if (!this.isConnecting) {
+        this.connect();
+      }
+    }
+  }
+
+  // Enviar indicador de typing en soporte
+  sendSupportTyping(sessionId, isTyping = true) {
+    if (this.socket?.connected) {
+      this.socket.emit('support_typing', { sessionId, isTyping });
+    }
+  }
+
+  // Cerrar sesión de soporte
+  closeSupportSession(sessionId) {
+    if (this.socket?.connected) {
+      this.socket.emit('support_close_session', { sessionId });
+      debugLogger.socket('support_close_session emitido', { sessionId });
     }
   }
 

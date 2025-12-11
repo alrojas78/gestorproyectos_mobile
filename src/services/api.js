@@ -224,4 +224,115 @@ export const teamsApi = {
   },
 };
 
+// Support API - Sistema de soporte al cliente
+export const supportApi = {
+  // Obtener sesiones de soporte
+  getSessions: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.channelId) params.append('channel_id', filters.channelId);
+    const response = await api.get(`/support/sessions?${params.toString()}`);
+    return response.data;
+  },
+
+  // Obtener detalles de una sesión
+  getSession: async (sessionId) => {
+    const response = await api.get(`/support/sessions/${sessionId}`);
+    return response.data;
+  },
+
+  // Obtener mensajes de una sesión
+  getSessionMessages: async (sessionId) => {
+    const response = await api.get(`/support/sessions/${sessionId}/messages`);
+    return response.data;
+  },
+
+  // Enviar mensaje como agente
+  sendMessage: async (sessionId, content, messageType = 'text') => {
+    const response = await api.post(`/support/sessions/${sessionId}/messages`, {
+      content,
+      message_type: messageType
+    });
+    return response.data;
+  },
+
+  // Asignar sesión al agente actual
+  assignSession: async (sessionId, agentId = null) => {
+    const response = await api.post(`/support/sessions/${sessionId}/assign`, {
+      agent_id: agentId
+    });
+    return response.data;
+  },
+
+  // Cerrar sesión
+  closeSession: async (sessionId, resolution = null) => {
+    const response = await api.post(`/support/sessions/${sessionId}/close`, {
+      resolution
+    });
+    return response.data;
+  },
+
+  // Escalar sesión
+  escalateSession: async (sessionId, data) => {
+    const response = await api.post(`/support/sessions/${sessionId}/escalate`, data);
+    return response.data;
+  },
+
+  // Marcar sesión como leída
+  markSessionAsRead: async (sessionId) => {
+    const response = await api.post(`/support/sessions/${sessionId}/read`);
+    return response.data;
+  },
+
+  // Toggle IA para sesión
+  toggleSessionAI: async (sessionId, enableAI) => {
+    const response = await api.post(`/support/sessions/${sessionId}/toggle-ai`, {
+      enable_ai: enableAI
+    });
+    return response.data;
+  },
+
+  // Obtener total de mensajes no leídos
+  getUnreadTotal: async () => {
+    const response = await api.get('/support/sessions/unread-total');
+    return response.data;
+  },
+
+  // Obtener canales de soporte
+  getChannels: async () => {
+    const response = await api.get('/support/channels');
+    return response.data;
+  },
+};
+
+// Push Notifications API
+export const pushApi = {
+  // Registrar token de push notification
+  registerToken: async (token, deviceInfo = {}) => {
+    const response = await api.post('/push-token', {
+      token,
+      device_type: deviceInfo.device_type || 'android',
+      device_name: deviceInfo.device_name || null,
+      device_model: deviceInfo.device_model || null,
+      os_version: deviceInfo.os_version || null,
+      app_version: deviceInfo.app_version || null,
+    });
+    return response.data;
+  },
+
+  // Desactivar token (en logout)
+  deactivateToken: async (token) => {
+    const response = await api.delete('/push-token', {
+      data: { token }
+    });
+    return response.data;
+  },
+
+  // Obtener tokens registrados del usuario (debug)
+  getTokens: async () => {
+    const response = await api.get('/push-tokens');
+    return response.data;
+  },
+};
+
 export default api;

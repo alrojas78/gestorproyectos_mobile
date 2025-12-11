@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import storage from '../services/storage';
-import { authApi } from '../services/api';
+import { authApi, pushApi } from '../services/api';
 import socketService from '../services/socketService';
 import debugLogger from '../services/debugLogger';
+import notificationService from '../services/notificationService';
 
 const AuthContext = createContext(null);
 
@@ -18,10 +19,55 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [pushToken, setPushToken] = useState(null);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Registrar push token cuando el usuario se autentica
+  const registerPushToken = async () => {
+    try {
+      debugLogger.log('[AUTH] Iniciando registro de push token...');
+      const token = await notificationService.registerForPushNotifications();
+
+      if (token) {
+        setPushToken(token);
+        debugLogger.log('[AUTH] Push token obtenido:', token);
+
+        // Obtener info del dispositivo
+        const deviceInfo = notificationService.getDeviceInfo();
+
+        // Registrar en el servidor
+        const result = await pushApi.registerToken(token, {
+          device_type: deviceInfo.osName?.toLowerCase() === 'ios' ? 'ios' : 'android',
+          device_name: deviceInfo.brand,
+          device_model: deviceInfo.modelName,
+          os_version: deviceInfo.osVersion,
+          app_version: '1.0.6',
+        });
+
+        debugLogger.log('[AUTH] Push token registrado en servidor:', result);
+      } else {
+        debugLogger.log('[AUTH] No se pudo obtener push token (emulador o permisos denegados)');
+      }
+    } catch (error) {
+      debugLogger.error('[AUTH] Error registrando push token:', error.message);
+    }
+  };
+
+  // Desactivar push token al cerrar sesion
+  const deactivatePushToken = async () => {
+    if (pushToken) {
+      try {
+        await pushApi.deactivateToken(pushToken);
+        debugLogger.log('[AUTH] Push token desactivado');
+      } catch (error) {
+        debugLogger.error('[AUTH] Error desactivando push token:', error.message);
+      }
+    }
+    setPushToken(null);
+  };
 
   const checkAuth = async () => {
     debugLogger.auth('checkAuth() iniciado');
@@ -38,6 +84,9 @@ export const AuthProvider = ({ children }) => {
         debugLogger.auth('Usuario autenticado, conectando socket...');
         await socketService.connect();
         debugLogger.auth('Socket conectado');
+
+        // Registrar push token despues de autenticacion exitosa
+        registerPushToken();
       } else {
         debugLogger.auth('No hay token guardado');
       }
@@ -72,6 +121,11 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
         debugLogger.auth('Conectando socket...');
         await socketService.connect();
+        debugLogger.auth('Socket conectado');
+
+        // Registrar push token despues de login exitoso
+        registerPushToken();
+
         debugLogger.auth('Login completado exitosamente');
         return { success: true };
       }
@@ -85,6 +139,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // Desactivar push token antes de cerrar sesion
+    await deactivatePushToken();
+
+    // Remover listeners de notificaciones
+    notificationService.removeNotificationListeners();
+
     socketService.disconnect();
     await storage.deleteItemAsync('authToken');
     setUser(null);

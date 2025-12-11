@@ -4,10 +4,203 @@
 
 ---
 
-## Estado Actual: PENDIENTE BUILD - VERSION 1.0.4
+## Estado Actual: BUILD EN PROCESO - VERSION 1.0.7
 
-**Version anterior:** 1.0.3
-**Proxima version:** 1.0.4
+**Version anterior:** 1.0.6
+**Version actual:** 1.0.7
+
+---
+
+## NUEVA FUNCIONALIDAD (2025-12-11) - NOTIFICACIONES PUSH
+
+### Estado: PENDIENTE BUILD
+
+### Descripcion
+Se implemento el sistema completo de notificaciones push para la app movil,
+permitiendo recibir alertas de nuevos mensajes cuando la app esta cerrada o en segundo plano.
+
+### Componentes Implementados
+
+#### 1. Servicio de Notificaciones (notificationService.js)
+- Registro para push notifications con Expo
+- Solicitud de permisos al usuario
+- Obtencion de Expo Push Token
+- Configuracion de canales de Android:
+  - `default`: Notificaciones generales
+  - `chat`: Mensajes de chat (alta prioridad)
+  - `tasks`: Notificaciones de tareas
+  - `support`: Soporte al cliente (alta prioridad)
+- Listeners para notificaciones recibidas y tocadas
+- Gestion de badge count
+
+#### 2. Integracion en AuthContext
+- Registro automatico de push token al login/checkAuth
+- Envio de token al servidor con info del dispositivo
+- Desactivacion del token al logout
+- Limpieza de listeners al cerrar sesion
+
+#### 3. Backend PHP
+- Nueva tabla `push_tokens` en la base de datos
+- Modelo `PushToken.php` para gestion de tokens
+- Controlador `PushNotificationController.php`
+- Endpoints:
+  - `POST /api/push-token`: Registrar token
+  - `DELETE /api/push-token`: Desactivar token
+  - `GET /api/push-tokens`: Listar tokens (debug)
+- Metodo estatico para enviar push via Expo Push API
+
+#### 4. WebSocket Server
+- Nuevo servicio `pushService.js`
+- Integracion con `chatHandler.js`
+- Envio automatico de push a usuarios offline cuando reciben mensaje
+- Deteccion de usuarios offline via `userSockets` Map
+
+#### 5. Actualizacion de App.js
+- Inicializacion de listeners de notificaciones
+- Navegacion automatica al tocar notificacion:
+  - Mensajes de chat -> ChatConversation
+  - Mensajes de soporte -> SupportConversation
+- Limpieza de badge al abrir la app
+
+### Archivos Nuevos
+- `/src/services/notificationService.js`
+- `/backend/src/models/PushToken.php`
+- `/backend/src/controllers/PushNotificationController.php`
+- `/backend/migrations/create_push_tokens_table.sql`
+- `/websocket-server/services/pushService.js`
+
+### Archivos Modificados
+- `/src/services/api.js` - Agregado pushApi
+- `/src/context/AuthContext.js` - Registro de push token
+- `/src/navigation/AppNavigator.js` - Soporte para navigationRef
+- `/App.js` - Inicializacion de notificaciones
+- `/app.json` - Version 1.0.7, configuracion expo-notifications
+- `/backend/src/routes/api.php` - Rutas de push token
+- `/websocket-server/handlers/chatHandler.js` - Envio de push a offline
+
+### Flujo de Notificaciones
+```
+1. Usuario hace login -> Se registra push token en servidor
+2. Usuario cierra app -> Estado offline en WebSocket
+3. Otro usuario envia mensaje
+4. WebSocket detecta destinatario offline
+5. WebSocket server envia push via Expo Push API
+6. Dispositivo muestra notificacion
+7. Usuario toca notificacion -> App abre y navega a conversacion
+```
+
+---
+
+## FIX CRITICO (2025-12-10) - URL DE WEBSOCKET INCORRECTA
+
+### Estado: CORREGIDO - PENDIENTE BUILD
+
+### Problema Identificado
+Los mensajes enviados desde la app movil NO llegaban en tiempo real a otros clientes,
+y los mensajes enviados desde la web NO llegaban a la app movil.
+
+### Causa Raiz
+La app movil estaba configurada para conectar directamente a `https://d.ateneo.co:3001`,
+pero el servidor WebSocket Node.js NO tiene SSL configurado directamente.
+
+La web funciona porque usa el proxy de Apache:
+```
+wss://d.ateneo.co/socket.io -> ws://localhost:3001/socket.io
+```
+
+La app estaba intentando conectar directamente al puerto 3001 sin pasar por el proxy.
+
+### Solucion Implementada
+Se cambio la URL de WebSocket en `socketService.js`:
+
+**Antes (incorrecto):**
+```javascript
+const SOCKET_URL = 'https://d.ateneo.co:3001';
+```
+
+**Despues (correcto):**
+```javascript
+const SOCKET_URL = 'wss://d.ateneo.co';
+```
+
+### Por que funciona ahora
+- `wss://d.ateneo.co` usa el puerto 443 (HTTPS/WSS)
+- Apache maneja SSL y redirige `/socket.io/*` a `localhost:3001`
+- El proxy de Apache esta configurado asi:
+```apache
+RewriteRule ^/socket.io/(.*) ws://localhost:3001/socket.io/$1 [P,L]
+ProxyPass /socket.io http://localhost:3001/socket.io
+ProxyPassReverse /socket.io http://localhost:3001/socket.io
+```
+
+### Archivo Modificado
+- `/src/services/socketService.js` - Linea 5
+
+---
+
+## NUEVA FUNCIONALIDAD (2025-12-10) - SISTEMA DE SOPORTE
+
+### Estado: PENDIENTE BUILD
+
+### Descripcion
+Se integro el sistema de soporte al cliente en la app movil, permitiendo a los agentes
+atender las consultas de clientes externos directamente desde el dispositivo movil.
+
+### Cambios Realizados
+
+#### 1. API de Soporte (api.js)
+- Nuevo objeto `supportApi` con endpoints para:
+  - `getSessions()` - Listar sesiones de soporte
+  - `getSession(id)` - Obtener detalles de sesion
+  - `getSessionMessages(id)` - Mensajes de una sesion
+  - `sendMessage(id, content)` - Enviar mensaje como agente
+  - `assignSession(id)` - Asignar sesion al agente
+  - `closeSession(id)` - Cerrar sesion
+  - `escalateSession(id, data)` - Escalar sesion
+  - `markSessionAsRead(id)` - Marcar como leida
+  - `toggleSessionAI(id, enable)` - Activar/desactivar IA
+  - `getUnreadTotal()` - Total de mensajes no leidos
+  - `getChannels()` - Canales de soporte
+
+#### 2. Eventos de Socket (socketService.js)
+- `connectAsAgent()` - Conectar como agente de soporte
+- `joinSupportSession(sessionId)` - Unirse a sesion
+- `leaveSupportSession(sessionId)` - Salir de sesion
+- `sendSupportMessage(sessionId, content)` - Enviar mensaje
+- `sendSupportTyping(sessionId)` - Indicador de escritura
+- `closeSupportSession(sessionId)` - Cerrar sesion via socket
+
+#### 3. Nuevas Pantallas
+- **SupportListScreen.js** - Lista de sesiones de soporte con:
+  - Filtros: Activas, Esperando, Escaladas, Todas
+  - Badges de estado (Bot, Agente, Escalada)
+  - Contador de mensajes no leidos
+  - Actualizacion en tiempo real via WebSocket
+
+- **SupportConversationScreen.js** - Conversacion de soporte con:
+  - Mensajes diferenciados por tipo (cliente, agente, IA, sistema)
+  - Acciones: Asignar, Escalar, Cerrar sesion
+  - Indicador de "escribiendo..."
+  - Info del cliente (email, telefono)
+  - Envio de mensajes via WebSocket
+
+#### 4. Integracion en ChatListScreen
+- Boton de soporte en header con badge de no leidos
+- Listener de eventos WebSocket para notificaciones
+- Navegacion a pantalla de soporte
+
+#### 5. Navegacion (AppNavigator.js)
+- Nuevas rutas: SupportList, SupportConversation
+
+### Archivos Modificados
+- `/src/services/api.js` - Agregado supportApi
+- `/src/services/socketService.js` - Eventos de soporte
+- `/src/screens/ChatListScreen.js` - Boton de soporte
+- `/src/navigation/AppNavigator.js` - Rutas de soporte
+
+### Archivos Nuevos
+- `/src/screens/SupportListScreen.js`
+- `/src/screens/SupportConversationScreen.js`
 
 ---
 
@@ -328,6 +521,8 @@ c1a387c fix: add memory cache to storage + don't auto-delete token on 401
 
 | Fecha | Version | Build ID | Estado | Cambios |
 |-------|---------|----------|--------|---------|
+| 2025-12-11 | 1.0.7 | a4c8839b-... | OK | **Notificaciones Push** |
+| 2025-12-10 | 1.0.6 | e1eeb132-... | OK | **FIX WebSocket URL** + Sistema de Soporte |
 | 2025-12-02 ~14:00 | 1.0.4 | PENDIENTE | PENDIENTE | Fix mensajes tiempo real (solo WebSocket) |
 | 2025-12-02 03:00 | 1.0.3 | 47cd83dc-... | OK | WebSocket tiempo real completo |
 | 2025-12-02 02:40 | 1.0.3 | a544a7ba-... | OK | UI cleanup, tabs reordenados |
@@ -418,7 +613,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 
 ## Roadmap de Versiones
 
-### Version 1.0.4 (Actual - Pendiente Build)
+### Version 1.0.7 (Actual - En Build)
 - [x] Login/Autenticacion
 - [x] Chat (contactos, conversaciones, proyectos, chat general)
 - [x] Tareas (listado por equipo, filtros)
@@ -433,11 +628,22 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 - [x] UI de debug removida
 - [x] Boton de adjuntar preparado
 - [x] **Fix mensajes tiempo real** - sendMessage ahora usa SOLO WebSocket
+- [x] **FIX CRITICO WebSocket URL** - Cambiado de `https://d.ateneo.co:3001` a `wss://d.ateneo.co`
+- [x] **Sistema de Soporte** - Atencion a clientes externos desde la app
+  - Lista de sesiones de soporte con filtros
+  - Conversacion de soporte en tiempo real
+  - Acciones: asignar, escalar, cerrar
+  - Notificaciones en tiempo real
+  - Badge de mensajes no leidos en chat
+- [x] **Notificaciones Push** - Alertas cuando app cerrada
+  - Registro de token Expo Push
+  - Canales de notificacion Android
+  - Push automatico a usuarios offline
+  - Navegacion al tocar notificacion
 - [ ] **Pendiente:** Generar APK y validar
 
 ### Version 1.1.0 (Proxima)
 - [ ] Adjuntar archivos en chat
-- [ ] Notificaciones push
 
 ### Version 2.0 (Planificada)
 - [ ] Llamadas de audio (WebRTC)

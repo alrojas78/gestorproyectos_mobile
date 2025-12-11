@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { chatApi, usersApi, projectsApi } from '../services/api';
+import { chatApi, usersApi, projectsApi, supportApi } from '../services/api';
+import socketService from '../services/socketService';
 import { useAuth } from '../context/AuthContext';
 
 const ChatListScreen = () => {
@@ -26,6 +27,7 @@ const ChatListScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('contacts');
   const [error, setError] = useState(null);
+  const [supportUnread, setSupportUnread] = useState(0);
 
   const loadData = async () => {
     setError(null);
@@ -74,6 +76,17 @@ const ChatListScreen = () => {
       } catch (e) {
         console.error('Error chat general:', e.message);
       }
+
+      // Cargar total de mensajes no leídos de soporte
+      try {
+        const supportData = await supportApi.getUnreadTotal();
+        if (supportData.success) {
+          setSupportUnread(supportData.total || 0);
+        }
+      } catch (e) {
+        // Silenciar error si el usuario no tiene acceso a soporte
+        console.log('Soporte no disponible:', e.message);
+      }
     } catch (error) {
       console.error('Error general en loadData:', error.message);
       setError('Error al cargar datos');
@@ -86,8 +99,32 @@ const ChatListScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadData();
+      // Conectar como agente de soporte para recibir notificaciones
+      socketService.connectAsAgent();
     }, [user?.id])
   );
+
+  // Escuchar eventos de soporte en tiempo real
+  useEffect(() => {
+    const handleNewSupportSession = () => {
+      setSupportUnread((prev) => prev + 1);
+    };
+
+    const handleSupportMessage = (data) => {
+      // Incrementar contador solo si no estamos en la pantalla de soporte
+      if (data.message?.sender_type === 'customer') {
+        setSupportUnread((prev) => prev + 1);
+      }
+    };
+
+    socketService.on('new_support_session', handleNewSupportSession);
+    socketService.on('support_message', handleSupportMessage);
+
+    return () => {
+      socketService.off('new_support_session', handleNewSupportSession);
+      socketService.off('support_message', handleSupportMessage);
+    };
+  }, []);
 
   const onRefresh = () => {
     setIsRefreshing(true);
@@ -260,10 +297,25 @@ const ChatListScreen = () => {
 
   const totalUnread = conversations.reduce((sum, c) => sum + (parseInt(c.unread_count) || 0), 0);
 
+  const handleSupportPress = () => {
+    setSupportUnread(0); // Resetear contador al entrar
+    navigation.navigate('SupportList');
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
+        <TouchableOpacity style={styles.supportButton} onPress={handleSupportPress}>
+          <Ionicons name="headset" size={22} color="#fff" />
+          {supportUnread > 0 && (
+            <View style={styles.supportBadge}>
+              <Text style={styles.supportBadgeText}>
+                {supportUnread > 99 ? '99+' : supportUnread}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {generalChat && (
@@ -350,8 +402,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' },
   loadingText: { color: '#9ca3af', marginTop: 12 },
-  header: { paddingTop: 50, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1e293b' },
+  header: { paddingTop: 50, paddingHorizontal: 20, paddingBottom: 16, backgroundColor: '#1e293b', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
+  supportButton: { position: 'relative', padding: 8, backgroundColor: '#6366f1', borderRadius: 20 },
+  supportBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: '#ef4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  supportBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
   generalChat: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#334155' },
   generalChatAvatar: { backgroundColor: '#6366f1' },
   tabContainer: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 12, backgroundColor: '#1e293b', borderBottomWidth: 1, borderBottomColor: '#334155', gap: 8 },

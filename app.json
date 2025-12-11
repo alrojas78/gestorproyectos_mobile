@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gestion de Proyectos",
     "slug": "sprints-diarios",
-    "version": "1.0.4",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -25,15 +25,33 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6366f1",
+          "sounds": [],
+          "androidMode": "default",
+          "androidCollapsedTitle": "#{unread_notifications} mensajes nuevos"
+        }
+      ]
     ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#6366f1",
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} mensajes nuevos"
+    },
     "extra": {
       "eas": {
         "projectId": "f73fa9ba-22e5-4eb0-b2bd-c646b616a8cb"

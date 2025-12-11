@@ -15,6 +15,8 @@ import TasksListScreen from '../screens/TasksListScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
 import TaskDetailScreen from '../screens/TaskDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SupportListScreen from '../screens/SupportListScreen';
+import SupportConversationScreen from '../screens/SupportConversationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -23,6 +25,8 @@ const ChatStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="ChatList" component={ChatListScreen} />
     <Stack.Screen name="ChatConversation" component={ChatConversationScreen} />
+    <Stack.Screen name="SupportList" component={SupportListScreen} />
+    <Stack.Screen name="SupportConversation" component={SupportConversationScreen} />
   </Stack.Navigator>
 );
 
@@ -98,7 +102,7 @@ const MainTabs = () => (
   </Tab.Navigator>
 );
 
-const AppNavigator = () => {
+const AppNavigator = ({ navigationRef }) => {
   const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
@@ -110,7 +114,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="Main" component={MainTabs} />
