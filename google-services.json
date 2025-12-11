@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "535084204666",
+    "project_id": "ateneo-sprints",
+    "storage_bucket": "ateneo-sprints.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:535084204666:android:b5d4892293375eed3431c3",
+        "android_client_info": {
+          "package_name": "co.ateneo.sprints"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7hDHREGHN4E6aCPHz2dMwourdt69wO2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

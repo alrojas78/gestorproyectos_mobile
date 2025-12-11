@@ -55,12 +55,16 @@ class NotificationService {
 
     try {
       // Obtener el projectId de la configuracion de Expo
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      // Fallback al projectId hardcoded si no esta disponible en Constants
+      let projectId = Constants.expoConfig?.extra?.eas?.projectId;
 
+      // Fallback: projectId de menntunsas (cuenta alternativa)
       if (!projectId) {
-        debugLogger.error('[NOTIFICATIONS] No se encontro projectId en la configuracion');
-        return null;
+        projectId = 'fa1e8874-bef6-4eeb-a745-bc0c62dbe6b7';
+        debugLogger.log('[NOTIFICATIONS] Usando projectId hardcoded (fallback)');
       }
+
+      debugLogger.log('[NOTIFICATIONS] ProjectId:', projectId);
 
       // Obtener Expo Push Token
       const tokenResponse = await Notifications.getExpoPushTokenAsync({
@@ -73,6 +77,11 @@ class NotificationService {
 
     } catch (error) {
       debugLogger.error('[NOTIFICATIONS] Error obteniendo token:', error.message);
+      debugLogger.error('[NOTIFICATIONS] Error completo:', JSON.stringify(error));
+      // Mostrar alerta para debug en produccion
+      if (typeof alert !== 'undefined') {
+        alert('Error push token: ' + error.message);
+      }
       return null;
     }
 

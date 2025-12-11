@@ -1,19 +1,67 @@
 # Informe de Seguimiento - App Movil Gestion de Proyectos
 
-## Fecha: 2025-12-02 (Actualizado: 02:30 UTC)
+## Fecha: 2025-12-11 (Actualizado: 23:00 UTC)
 
 ---
 
-## Estado Actual: BUILD EN PROCESO - VERSION 1.0.7
+## Estado Actual: NOTIFICACIONES PUSH FUNCIONANDO - VERSION 1.0.11
 
-**Version anterior:** 1.0.6
-**Version actual:** 1.0.7
+**Version anterior:** 1.0.10
+**Version actual:** 1.0.11
+
+---
+
+## CONFIGURACION FIREBASE/FCM (2025-12-11) - COMPLETADO
+
+### Estado: FUNCIONANDO
+
+### Descripcion
+Se configuro Firebase Cloud Messaging (FCM) para habilitar las notificaciones push
+cuando la app esta cerrada o en segundo plano.
+
+### Credenciales Firebase
+
+**Proyecto Firebase:** ateneo-sprints
+- **Console:** https://console.firebase.google.com/project/ateneo-sprints
+- **Project Number:** 535084204666
+- **Package Android:** co.ateneo.sprints
+
+**Archivos de Credenciales:**
+- `/var/www/d.ateneo.co/mobile-app/google-services.json` - Config Firebase para Android
+- `/var/www/d.ateneo.co/websocket-server/config/firebase-service-account.json` - Service Account
+- `/var/www/d.ateneo.co/docs/ateneo-keystore.jks` - Android Keystore (password: ateneo2025)
+- `/var/www/d.ateneo.co/docs/ateneo-sprints-firebase-adminsdk-fbsvc-8926f9684c.json` - Backup Service Account
+
+### Credenciales Expo FCM (subidas via GraphQL API)
+- **Google Service Account Key ID:** 7950b6c3-483f-4349-87c1-078f630bc01e
+- **Android App Credentials ID:** 204ba058-b735-4d71-8da1-9e5dc058317f
+- **Account ID (menntunsas):** 58e23488-1521-40d3-a1f3-9db2f88b6f91
+
+### Configuracion en app.json
+```json
+{
+  "android": {
+    "googleServicesFile": "./google-services.json"
+  }
+}
+```
+
+### Test de Notificacion Push
+```bash
+curl -X POST https://exp.host/--/api/v2/push/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "ExponentPushToken[TOKEN_AQUI]",
+    "title": "Test",
+    "body": "Mensaje de prueba"
+  }'
+```
 
 ---
 
 ## NUEVA FUNCIONALIDAD (2025-12-11) - NOTIFICACIONES PUSH
 
-### Estado: PENDIENTE BUILD
+### Estado: COMPLETADO - VERSION 1.0.11
 
 ### Descripcion
 Se implemento el sistema completo de notificaciones push para la app movil,
@@ -519,34 +567,52 @@ c1a387c fix: add memory cache to storage + don't auto-delete token on 401
 
 ## Historial de Builds
 
-| Fecha | Version | Build ID | Estado | Cambios |
-|-------|---------|----------|--------|---------|
-| 2025-12-11 | 1.0.7 | a4c8839b-... | OK | **Notificaciones Push** |
-| 2025-12-10 | 1.0.6 | e1eeb132-... | OK | **FIX WebSocket URL** + Sistema de Soporte |
-| 2025-12-02 ~14:00 | 1.0.4 | PENDIENTE | PENDIENTE | Fix mensajes tiempo real (solo WebSocket) |
-| 2025-12-02 03:00 | 1.0.3 | 47cd83dc-... | OK | WebSocket tiempo real completo |
-| 2025-12-02 02:40 | 1.0.3 | a544a7ba-... | OK | UI cleanup, tabs reordenados |
-| 2025-12-02 00:32 | 1.0.2 | 5ec7fb87-... | OK | Backend auth fix |
-| 2025-12-02 00:05 | 1.0.1 | 4e01d1dc-... | OK | Debug logging interceptor |
-| 2025-12-01 23:51 | 1.0.0 | ... | OK | Memory cache + fix interceptor 401 |
+| Fecha | Version | Build ID | Estado | Cuenta | Cambios |
+|-------|---------|----------|--------|--------|---------|
+| 2025-12-11 | 1.0.11 | - | OK | menntunsas | **Firebase FCM + Push Notifications funcionando** |
+| 2025-12-11 | 1.0.10 | - | OK | menntunsas | Debug alerts para push token |
+| 2025-12-11 | 1.0.9 | - | OK | menntunsas | Hardcoded projectId fallback |
+| 2025-12-11 | 1.0.8 | 9ce82e88-... | OK | menntunsas | Build con cuenta alternativa |
+| 2025-12-11 | 1.0.7 | a4c8839b-... | OK | alrojas78 | Notificaciones Push (sin FCM) |
+| 2025-12-10 | 1.0.6 | e1eeb132-... | OK | alrojas78 | FIX WebSocket URL + Sistema de Soporte |
+| 2025-12-02 | 1.0.3 | 47cd83dc-... | OK | alrojas78 | WebSocket tiempo real completo |
+| 2025-12-02 | 1.0.2 | 5ec7fb87-... | OK | alrojas78 | Backend auth fix |
+| 2025-12-02 | 1.0.1 | 4e01d1dc-... | OK | alrojas78 | Debug logging interceptor |
+| 2025-12-01 | 1.0.0 | - | OK | alrojas78 | Version inicial |
 
 ---
 
 ## Credenciales Expo/EAS
 
+### Cuenta Principal
 - **Email:** alexanderrojas78@gmail.com
 - **Usuario:** alrojas78
 - **Token:** E3Kh81dSYzm9rHHUcY_Us0BdrJWeye9PkK1CmByz
 - **Proyecto:** https://expo.dev/accounts/alrojas78/projects/sprints-diarios
+
+### Cuenta Alternativa (usar cuando la principal agote creditos gratuitos)
+- **Usuario:** menntunsas
+- **Token:** jGVe3gPd1_TIn7eXjPrwHNf8uKmFeu46t-fi6ECR
+- **Proyecto:** https://expo.dev/accounts/menntunsas/projects/sprints-diarios
+- **Project ID:** fa1e8874-bef6-4eeb-a745-bc0c62dbe6b7
+
+**NOTA:** Para cambiar de cuenta, modificar el `app.json`:
+- Cambiar `owner` al usuario deseado
+- Cambiar `extra.eas.projectId` al ID del proyecto correspondiente
 
 ---
 
 ## Comandos Utiles
 
 ```bash
-# Generar nuevo APK
+# Generar nuevo APK (Cuenta Principal - alrojas78)
 cd /var/www/d.ateneo.co/mobile-app
 export EXPO_TOKEN="E3Kh81dSYzm9rHHUcY_Us0BdrJWeye9PkK1CmByz"
+eas build -p android --profile preview --non-interactive
+
+# Generar nuevo APK (Cuenta Alternativa - menntunsas)
+cd /var/www/d.ateneo.co/mobile-app
+export EXPO_TOKEN="jGVe3gPd1_TIn7eXjPrwHNf8uKmFeu46t-fi6ECR"
 eas build -p android --profile preview --non-interactive
 
 # Ver builds
@@ -613,7 +679,7 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 
 ## Roadmap de Versiones
 
-### Version 1.0.7 (Actual - En Build)
+### Version 1.0.11 (Actual - FUNCIONANDO)
 - [x] Login/Autenticacion
 - [x] Chat (contactos, conversaciones, proyectos, chat general)
 - [x] Tareas (listado por equipo, filtros)
@@ -622,34 +688,27 @@ curl -H "Authorization: Bearer $TOKEN" "https://d.ateneo.co/backend/api/conversa
 - [x] Compatibilidad web para debug
 - [x] Memory cache para token
 - [x] Fix backend Authorization header
-- [x] Fix WebSocket URL (puerto 3001)
-- [x] Fix listeners del socket
-- [x] Orden de tabs corregido
-- [x] UI de debug removida
-- [x] Boton de adjuntar preparado
-- [x] **Fix mensajes tiempo real** - sendMessage ahora usa SOLO WebSocket
-- [x] **FIX CRITICO WebSocket URL** - Cambiado de `https://d.ateneo.co:3001` a `wss://d.ateneo.co`
+- [x] Fix WebSocket URL - Cambiado a `wss://d.ateneo.co`
 - [x] **Sistema de Soporte** - Atencion a clientes externos desde la app
-  - Lista de sesiones de soporte con filtros
-  - Conversacion de soporte en tiempo real
-  - Acciones: asignar, escalar, cerrar
-  - Notificaciones en tiempo real
-  - Badge de mensajes no leidos en chat
-- [x] **Notificaciones Push** - Alertas cuando app cerrada
-  - Registro de token Expo Push
-  - Canales de notificacion Android
-  - Push automatico a usuarios offline
-  - Navegacion al tocar notificacion
-- [ ] **Pendiente:** Generar APK y validar
+- [x] **Notificaciones Push FUNCIONANDO**
+  - Firebase Cloud Messaging configurado
+  - google-services.json integrado
+  - Credenciales FCM subidas a Expo
+  - Push notifications probadas y funcionando
 
 ### Version 1.1.0 (Proxima)
 - [ ] Adjuntar archivos en chat
+- [ ] Remover debug alerts de AuthContext.js y notificationService.js
 
 ### Version 2.0 (Planificada)
 - [ ] Llamadas de audio (WebRTC)
 - [ ] Videollamadas
 - [ ] Llamadas grupales
 - [ ] Compartir pantalla
+
+### Notas para Publicacion en Stores
+- **Play Store (Android):** Las credenciales FCM ya estan configuradas. Solo necesita build de produccion.
+- **App Store (iOS):** Requiere cuenta Apple Developer ($99/año) y configurar APNs (Apple Push Notifications).
 
 ---
 

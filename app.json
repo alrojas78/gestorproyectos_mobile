@@ -2,7 +2,7 @@
   "expo": {
     "name": "Gestion de Proyectos",
     "slug": "sprints-diarios",
-    "version": "1.0.8",
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -23,6 +23,7 @@
       },
       "package": "co.ateneo.sprints",
       "edgeToEdgeEnabled": true,
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -52,11 +53,11 @@
       "androidMode": "default",
       "androidCollapsedTitle": "#{unread_notifications} mensajes nuevos"
     },
+    "owner": "menntunsas",
     "extra": {
       "eas": {
-        "projectId": "f73fa9ba-22e5-4eb0-b2bd-c646b616a8cb"
+        "projectId": "fa1e8874-bef6-4eeb-a745-bc0c62dbe6b7"
       }
-    },
-    "owner": "alrojas78"
+    }
   }
 }

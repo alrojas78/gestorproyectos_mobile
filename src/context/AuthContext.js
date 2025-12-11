@@ -44,15 +44,19 @@ export const AuthProvider = ({ children }) => {
           device_name: deviceInfo.brand,
           device_model: deviceInfo.modelName,
           os_version: deviceInfo.osVersion,
-          app_version: '1.0.6',
+          app_version: '1.0.10',
         });
 
         debugLogger.log('[AUTH] Push token registrado en servidor:', result);
+        // Debug alert - remover en produccion
+        alert('Push token registrado: ' + token.substring(0, 30) + '...');
       } else {
         debugLogger.log('[AUTH] No se pudo obtener push token (emulador o permisos denegados)');
+        alert('No se pudo obtener push token');
       }
     } catch (error) {
       debugLogger.error('[AUTH] Error registrando push token:', error.message);
+      alert('Error registrando push: ' + error.message);
     }
   };
 
